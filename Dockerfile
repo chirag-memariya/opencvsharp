@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/aspnet:6.0-jammy as builder
+FROM mcr.microsoft.com/dotnet/aspnet:7.0-jammy as builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV OPENCV_VERSION=4.8.0
@@ -14,7 +14,6 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
       ca-certificates \
       build-essential \
       cmake \
-      git \
       libtbb-dev \
       libatlas-base-dev \
       libgtk2.0-dev \
@@ -88,7 +87,9 @@ RUN cd opencv && mkdir build && cd build && \
     .. && make -j$(nproc) && make install && ldconfig
 
 # Download OpenCvSharp
-RUN git clone https://github.com/shimat/opencvsharp.git && cd opencvsharp
+
+COPY ../../ ./opencvsharp/
+RUN cd opencvsharp
 
 # Install the Extern lib.
 RUN mkdir /opencvsharp/make && cd /opencvsharp/make && \
@@ -98,18 +99,18 @@ RUN mkdir /opencvsharp/make && cd /opencvsharp/make && \
     rm -rf /opencv_contrib && \
     cp /opencvsharp/make/OpenCvSharpExtern/libOpenCvSharpExtern.so /usr/lib/ && \
     mkdir /artifacts && \
-    cp /opencvsharp/make/OpenCvSharpExtern/libOpenCvSharpExtern.so /artifacts/
+    cp /opencvsharp/make/OpenCvSharpExtern/libOpenCvSharpExtern.so /artifacts/ 
 
 
 ########## Test native .so file ##########
 
-FROM mcr.microsoft.com/dotnet/sdk:6.0-jammy
+FROM mcr.microsoft.com/dotnet/sdk:7.0-jammy
 RUN apt-get update && apt-get -y install --no-install-recommends gcc
 # /usr/lib/libOpenCvSharpExtern.so
 # /usr/local/lib/libopencv_*.a
 COPY --from=builder /usr/lib /usr/lib
 #COPY --from=builder /usr/local/lib /usr/local/lib
-
+# RUN mkdir /usr/lib/test && cp /test/ /test/
 RUN echo "\n\
 #include <stdio.h> \n\
 int core_Mat_sizeof(); \n\
@@ -124,19 +125,21 @@ int main(){ \n\
 
 ########## Test .NET class libraries ##########
 
-FROM mcr.microsoft.com/dotnet/sdk:6.0-jammy
+FROM mcr.microsoft.com/dotnet/sdk:7.0-jammy AS tmjk
 COPY --from=builder /usr/lib /usr/lib
 # Install Build the C# part of OpenCvSharp
-RUN git clone https://github.com/shimat/opencvsharp.git && cd opencvsharp
+COPY ../../ ./opencvsharp/
+RUN cd opencvsharp
 RUN cd /opencvsharp/src/OpenCvSharp && \
-    dotnet build -c Release -f net6.0 && \
+    dotnet build -c Release -f net7.0 && \
     cd /opencvsharp/src/OpenCvSharp.Extensions && \
-    dotnet build -c Release -f net6.0
-
-RUN dotnet test /opencvsharp/test/OpenCvSharp.Tests/OpenCvSharp.Tests.csproj -c Release -f net6.0 --runtime ubuntu.20.04-x64 --logger "trx;LogFileName=test-results.trx" < /dev/null
-
-# Simple console app test using NuGet
-# RUN dotnet new console -f net6.0 -o "ConsoleApp01" && cd /ConsoleApp01 && \
+    dotnet build -c Release -f net7.0
+RUN dotnet test /opencvsharp/test/OpenCvSharp.Tests/OpenCvSharp.Tests.csproj -c Release -f net7.0 --runtime ubuntu.22.04-x64 --logger "trx;LogFileName=test-results.trx" 
+# RUN cp /opencvsharp/test/OpenCvSharp.Tests/test-results.trx /usr/lib/test-results.trx  
+RUN cp test-results.trx /arjun/test-results.trx
+# RUN  mkdir /arjun && cp arjun /arjun/
+#Simple console app test using NuGet
+# RUN dotnet new console -f net7.0 -o "ConsoleApp01" && cd /ConsoleApp01 && \
 #    echo "\n\
 #using System; \n\
 #using OpenCvSharp; \n\
@@ -157,6 +160,9 @@ RUN dotnet test /opencvsharp/test/OpenCvSharp.Tests/OpenCvSharp.Tests.csproj -c 
 
 ########## Final image ##########
 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0-jammy as final
+FROM mcr.microsoft.com/dotnet/aspnet:7.0-jammy as final
 COPY --from=builder /usr/lib /usr/lib
+# COPY --from=final1 /arjun /arjun
+COPY --from=tmjk /arjun/test-results.trx /arjun/test-results.trx
 COPY --from=builder /artifacts /artifacts
+# COPY --from=test-results /test-results.trx /test-results.trx
