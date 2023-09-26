@@ -140,7 +140,7 @@ RUN cd /opencvsharp/src/OpenCvSharp && \
     dotnet build -c Release -f net7.0 && \
     cd /opencvsharp/src/OpenCvSharp.Extensions && \
     dotnet build -c Release -f net7.0
-RUN dotnet test /opencvsharp/test/OpenCvSharp.Tests/OpenCvSharp.Tests.csproj -c Release -f net7.0 --runtime osx-arm64 --logger "trx;LogFileName=test-results.trx" 
+RUN dotnet test /opencvsharp/test/OpenCvSharp.Tests/OpenCvSharp.Tests.csproj -c Release -f net7.0 --runtime ubuntu.22.04-arm64 --logger "trx;LogFileName=test-results.trx" 
 RUN cp /opencvsharp/test/OpenCvSharp.Tests/test-results.trx /usr/lib/test-results.trx  
 # RUN cp test-results.trx /arjun/test-results.trx
 RUN  mkdir /arjun && cp arjun /arjun/
